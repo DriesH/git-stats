@@ -9,7 +9,7 @@ pub struct WordCount {
 
 const STOPWORDS: &[&str] = &[
     "the", "and", "for", "with", "this", "that", "from", "into", "are", "was", "but", "not", "you",
-    "your", "all", "can", "use", "now", "out",
+    "your", "all", "can", "use", "add", "now", "out",
 ];
 
 pub fn top_words(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
@@ -211,10 +211,10 @@ mod tests {
 
     #[test]
     fn bigrams_pair_adjacent_surviving_tokens() {
-        let records = vec![msg("add login support"), msg("add login support")];
+        let records = vec![msg("refactor login parser"), msg("refactor login parser")];
         let b = top_bigrams(&records, 10);
-        assert!(b.iter().any(|x| x.word == "add login" && x.count == 2));
-        assert!(b.iter().any(|x| x.word == "login support" && x.count == 2));
+        assert!(b.iter().any(|x| x.word == "refactor login" && x.count == 2));
+        assert!(b.iter().any(|x| x.word == "login parser" && x.count == 2));
     }
 
     #[test]
