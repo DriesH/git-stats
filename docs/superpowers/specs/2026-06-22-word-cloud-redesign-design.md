@@ -129,6 +129,31 @@ Pure functions get unit tests first (TDD):
 TUI rendering is not unit-tested (consistent with current `panels.rs`); verified
 by running the app.
 
+## Trailer & boilerplate filtering (added during implementation)
+
+Rendering against real repos showed that git trailers and tool boilerplate
+dominated the phrases and word cloud (e.g. `noreply anthropic`, `authored`,
+`generated`). `top_words` and `top_bigrams` therefore exclude noise lines
+before tokenizing:
+
+- Lines starting with `🤖` or containing `generated with` (case-insensitive).
+- `Key: value` trailer lines whose key (alphabetic/hyphen only) is one of:
+  `co-authored-by`, `signed-off-by`, `reviewed-by`, `acked-by`, `tested-by`,
+  `reported-by`, `suggested-by`, `refs`, `ref`, `cc`. The key-shape check keeps
+  conventional-commit subjects like `feat: add x` from being treated as
+  trailers.
+
+Both functions iterate per line (skipping noise lines), so phrases also never
+bridge a line break. `commit_types` is unaffected — it reads only the subject
+(first) line.
+
+## Note on `top_words` limit
+
+The scoreboard keeps the pre-existing `top_words(records, 30)`; the widget
+slices `take(15)`. Output is identical to a `15` limit (only 15 render); the
+larger fetch is harmless and left unchanged to avoid touching unrelated
+behavior.
+
 ## Out of scope
 
 - Trigrams / n>2.
