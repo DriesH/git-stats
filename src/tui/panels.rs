@@ -121,7 +121,11 @@ pub fn words_widget(sb: &Scoreboard) -> Paragraph<'_> {
         let pct = t.count * 100 / type_total;
         let text = format!("{:<9} {:<16} {:>4} {:>3}%", t.kind, bar, t.count, pct);
         let line = Line::from(text);
-        lines.push(if i == 0 { line.style(accent_style()) } else { line });
+        lines.push(if i == 0 {
+            line.style(accent_style())
+        } else {
+            line
+        });
     }
 
     lines.push(Line::from(""));
@@ -133,7 +137,11 @@ pub fn words_widget(sb: &Scoreboard) -> Paragraph<'_> {
         let bar = "▇".repeat((b.count * 12 / bg_max).max(1));
         let text = format!("{:<16} {:<12} {:>3}", b.word, bar, b.count);
         let line = Line::from(text);
-        lines.push(if i == 0 { line.style(accent_style()) } else { line });
+        lines.push(if i == 0 {
+            line.style(accent_style())
+        } else {
+            line
+        });
     }
 
     lines.push(Line::from(""));
