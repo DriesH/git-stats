@@ -1,8 +1,9 @@
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 
 use crate::scoreboard::Scoreboard;
-use crate::tui::theme::{accent_style, header_style, medal};
+use crate::tui::theme::{accent_style, dim_style, header_style, medal};
 
 fn panel_block(title: &str) -> Block<'_> {
     Block::default()
@@ -108,13 +109,58 @@ pub fn streaks_widget(sb: &Scoreboard) -> Paragraph<'_> {
 }
 
 pub fn words_widget(sb: &Scoreboard) -> Paragraph<'_> {
-    let lines: Vec<Line> = sb
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Section 1 — commit types: bar normalized to the largest type count,
+    // plus raw count and percentage of all commits.
+    lines.push(Line::from(Span::styled("By type", header_style())));
+    let type_max = sb.types.iter().map(|t| t.count).max().unwrap_or(1).max(1);
+    let type_total = sb.types.iter().map(|t| t.count).sum::<usize>().max(1);
+    for (i, t) in sb.types.iter().enumerate() {
+        let bar = "█".repeat((t.count * 16 / type_max).max(1));
+        let pct = t.count * 100 / type_total;
+        let text = format!("{:<9} {:<16} {:>4} {:>3}%", t.kind, bar, t.count, pct);
+        let line = Line::from(text);
+        lines.push(if i == 0 { line.style(accent_style()) } else { line });
+    }
+
+    lines.push(Line::from(""));
+
+    // Section 2 — top two-word phrases, bar normalized to the largest count.
+    lines.push(Line::from(Span::styled("Top phrases", header_style())));
+    let bg_max = sb.bigrams.iter().map(|b| b.count).max().unwrap_or(1).max(1);
+    for (i, b) in sb.bigrams.iter().enumerate() {
+        let bar = "▇".repeat((b.count * 12 / bg_max).max(1));
+        let text = format!("{:<16} {:<12} {:>3}", b.word, bar, b.count);
+        let line = Line::from(text);
+        lines.push(if i == 0 { line.style(accent_style()) } else { line });
+    }
+
+    lines.push(Line::from(""));
+
+    // Section 3 — word cloud: `word·count`, brightness tiered by rank to fake
+    // size = frequency. Wraps across lines via the Paragraph's Wrap.
+    lines.push(Line::from(Span::styled("Top words", header_style())));
+    let spans: Vec<Span> = sb
         .words
         .iter()
         .take(15)
-        .map(|w| Line::from(format!("{:<15} {}", w.word, "▪".repeat(w.count.min(40)))))
+        .enumerate()
+        .map(|(i, w)| {
+            let style = match i {
+                0 => accent_style().add_modifier(Modifier::BOLD),
+                1..=2 => accent_style(),
+                3..=7 => Style::default(),
+                _ => dim_style(),
+            };
+            Span::styled(format!("{}·{}  ", w.word, w.count), style)
+        })
         .collect();
-    Paragraph::new(lines).block(panel_block(" Commit Word Cloud "))
+    lines.push(Line::from(spans));
+
+    Paragraph::new(lines)
+        .block(panel_block(" Commit Word Cloud "))
+        .wrap(Wrap { trim: true })
 }
 
 pub fn ownership_widget(sb: &Scoreboard) -> Paragraph<'_> {
