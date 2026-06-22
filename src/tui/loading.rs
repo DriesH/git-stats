@@ -57,22 +57,32 @@ pub fn run_loading(
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(7),
-                    Constraint::Length(3),
-                    Constraint::Length(3),
+                    Constraint::Length(7), // banner
+                    Constraint::Length(1), // status line (counts + ETA)
+                    Constraint::Length(3), // progress bar
+                    Constraint::Length(1), // cancel hint
                     Constraint::Min(0),
                 ])
                 .split(f.area());
 
             f.render_widget(Paragraph::new(BANNER).style(title_style()), chunks[0]);
 
-            let label = match eta {
+            // Verbose progress text lives on its own line so the gauge fill
+            // never renders underneath it.
+            let status = match eta {
                 Some(s) => format!(
-                    "{} {}/{} commits  ~{:.0}s left",
+                    "{}  {} / {} commits   ~{:.0}s left",
                     spinner[frame], d, total, s
                 ),
-                None => format!("{} {}/{} commits  estimating…", spinner[frame], d, total),
+                None => format!(
+                    "{}  {} / {} commits   estimating…",
+                    spinner[frame], d, total
+                ),
             };
+            f.render_widget(Paragraph::new(status), chunks[1]);
+
+            // The gauge carries only a short percentage label, which ratatui
+            // renders split-coloured across the fill boundary and stays legible.
             let gauge = Gauge::default()
                 .block(
                     Block::default()
@@ -80,10 +90,10 @@ pub fn run_loading(
                         .title(" Reading history "),
                 )
                 .ratio(ratio.clamp(0.0, 1.0))
-                .label(label);
-            f.render_widget(gauge, chunks[1]);
+                .label(format!("{:.0}%", ratio.clamp(0.0, 1.0) * 100.0));
+            f.render_widget(gauge, chunks[2]);
 
-            f.render_widget(Paragraph::new("q / Esc to cancel"), chunks[2]);
+            f.render_widget(Paragraph::new("q / Esc to cancel"), chunks[3]);
         })?;
 
         if event::poll(Duration::from_millis(16))? {
