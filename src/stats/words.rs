@@ -9,7 +9,7 @@ pub struct WordCount {
 
 const STOPWORDS: &[&str] = &[
     "the", "and", "for", "with", "this", "that", "from", "into", "are", "was", "but", "not", "you",
-    "your", "all", "can", "use", "add", "now", "out",
+    "your", "all", "can", "use", "now", "out",
 ];
 
 pub fn top_words(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
@@ -21,6 +21,38 @@ pub fn top_words(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
                 continue;
             }
             *by.entry(w).or_default() += 1;
+        }
+    }
+    let mut out: Vec<WordCount> = by
+        .into_iter()
+        .map(|(word, count)| WordCount { word, count })
+        .collect();
+    out.sort_by(|a, b| b.count.cmp(&a.count).then(a.word.cmp(&b.word)));
+    out.truncate(limit);
+    out
+}
+
+/// Count adjacent two-word phrases. A token is kept under the same rule as
+/// `top_words` (length >= 3, not a stopword). A dropped token breaks
+/// adjacency, so no phrase bridges a removed stopword. Empty splits (from
+/// runs of punctuation) are skipped without breaking adjacency.
+pub fn top_bigrams(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
+    let mut by: HashMap<String, usize> = HashMap::new();
+    for r in records {
+        let mut prev: Option<String> = None;
+        for raw in r.message.split(|c: char| !c.is_alphanumeric()) {
+            if raw.is_empty() {
+                continue;
+            }
+            let w = raw.to_lowercase();
+            if w.len() < 3 || STOPWORDS.contains(&w.as_str()) {
+                prev = None;
+                continue;
+            }
+            if let Some(p) = &prev {
+                *by.entry(format!("{p} {w}")).or_default() += 1;
+            }
+            prev = Some(w);
         }
     }
     let mut out: Vec<WordCount> = by
@@ -175,5 +207,34 @@ mod tests {
     #[test]
     fn commit_types_empty_input_is_empty() {
         assert!(commit_types(&[]).is_empty());
+    }
+
+    #[test]
+    fn bigrams_pair_adjacent_surviving_tokens() {
+        let records = vec![msg("add login support"), msg("add login support")];
+        let b = top_bigrams(&records, 10);
+        assert!(b.iter().any(|x| x.word == "add login" && x.count == 2));
+        assert!(b.iter().any(|x| x.word == "login support" && x.count == 2));
+    }
+
+    #[test]
+    fn bigrams_stopword_breaks_adjacency() {
+        // "the" is a stopword and is dropped, so it must NOT bridge fix<->bug.
+        let records = vec![msg("fix the bug")];
+        let b = top_bigrams(&records, 10);
+        assert!(!b.iter().any(|x| x.word == "fix bug"));
+        assert!(b.is_empty());
+    }
+
+    #[test]
+    fn bigrams_sorted_and_truncated() {
+        let records = vec![
+            msg("alpha beta alpha beta"), // "alpha beta" x2, "beta alpha" x1
+            msg("gamma delta"),           // "gamma delta" x1
+        ];
+        let b = top_bigrams(&records, 2);
+        assert_eq!(b.len(), 2);
+        assert_eq!(b[0].word, "alpha beta");
+        assert_eq!(b[0].count, 2);
     }
 }
