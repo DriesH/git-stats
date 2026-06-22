@@ -162,8 +162,9 @@ Runs while step 4 collects records.
 
 ## Error handling
 
-- `anyhow` with `.context(...)` in the app/binary; `thiserror` for typed errors
-  in the git/stats library modules.
+- `anyhow` with `.context(...)` end-to-end; library-module errors bubble up via
+  `?` and gain context at the binary. (No `thiserror` in v1 — no public typed
+  error enum is needed yet; add it if/when one is.)
 - Not a git repo -> clear message, non-zero exit, no backtrace shown to user.
 - Empty repo (no commits) -> "no commits yet" screen rather than a crash.
 - A diff that fails for a single commit is logged and skipped; the run
@@ -192,7 +193,7 @@ The project root gets a `CLAUDE.md` stating the project goal and one hard rule:
 - `git2` — libgit2 bindings
 - `ratatui` + `crossterm` — TUI
 - `rayon` — data parallelism
-- `anyhow` + `thiserror` — errors
+- `anyhow` — errors
 - `chrono` — timestamp/`--since` handling and hour/weekday math
 - a figlet/banner crate (e.g. `figlet-rs`) or an embedded banner string
 ```
