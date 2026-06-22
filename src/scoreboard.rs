@@ -64,7 +64,7 @@ mod tests {
     fn analyze_populates_all_panels() {
         let records = vec![
             rec("alice", 1_704_067_200, &[("a.rs", 5, 1)]),
-            rec("bob",   1_704_153_600, &[("a.rs", 2, 0)]),
+            rec("bob", 1_704_153_600, &[("a.rs", 2, 0)]),
         ];
         let sb = analyze(&records);
         assert_eq!(sb.committers.len(), 2);

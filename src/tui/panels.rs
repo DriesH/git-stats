@@ -151,9 +151,9 @@ pub fn vitals_widget(sb: &Scoreboard) -> Paragraph<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ratatui::{backend::TestBackend, Terminal};
     use crate::scoreboard::analyze;
     use crate::stats::rec;
+    use ratatui::{backend::TestBackend, Terminal};
 
     #[test]
     fn renders_committers_without_panic_and_shows_name() {

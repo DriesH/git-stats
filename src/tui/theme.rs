@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use ratatui::style::{Color, Modifier, Style};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 pub const BANNER: &str = r#"
   ____ ___ _____   ____ _____ _  _____ ____
@@ -44,12 +44,20 @@ pub fn medal(rank: usize) -> String {
 
 /// Bold magenta — used for top-level titles.
 pub fn title_style() -> Style {
-    maybe(Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD))
+    maybe(
+        Style::default()
+            .fg(Color::Magenta)
+            .add_modifier(Modifier::BOLD),
+    )
 }
 
 /// Bold cyan — used for table headers and section headings.
 pub fn header_style() -> Style {
-    maybe(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+    maybe(
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )
 }
 
 /// Yellow — used for highlighted values and accents.

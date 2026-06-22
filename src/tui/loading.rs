@@ -46,7 +46,11 @@ pub fn run_loading(
 
         let elapsed = start.elapsed().as_secs_f64();
         let eta = eta_seconds(d, total, elapsed);
-        let ratio = if total == 0 { 0.0 } else { d as f64 / total as f64 };
+        let ratio = if total == 0 {
+            0.0
+        } else {
+            d as f64 / total as f64
+        };
         frame = (frame + 1) % spinner.len();
 
         term.draw(|f| {
@@ -63,11 +67,18 @@ pub fn run_loading(
             f.render_widget(Paragraph::new(BANNER).style(title_style()), chunks[0]);
 
             let label = match eta {
-                Some(s) => format!("{} {}/{} commits  ~{:.0}s left", spinner[frame], d, total, s),
+                Some(s) => format!(
+                    "{} {}/{} commits  ~{:.0}s left",
+                    spinner[frame], d, total, s
+                ),
                 None => format!("{} {}/{} commits  estimating…", spinner[frame], d, total),
             };
             let gauge = Gauge::default()
-                .block(Block::default().borders(Borders::ALL).title(" Reading history "))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(" Reading history "),
+                )
                 .ratio(ratio.clamp(0.0, 1.0))
                 .label(label);
             f.render_widget(gauge, chunks[1]);

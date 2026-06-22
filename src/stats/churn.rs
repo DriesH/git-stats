@@ -1,10 +1,18 @@
-use std::collections::HashMap;
 use crate::model::CommitRecord;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChurnStat { pub path: String, pub added: u64, pub removed: u64 }
+pub struct ChurnStat {
+    pub path: String,
+    pub added: u64,
+    pub removed: u64,
+}
 
-impl ChurnStat { pub fn total(&self) -> u64 { self.added + self.removed } }
+impl ChurnStat {
+    pub fn total(&self) -> u64 {
+        self.added + self.removed
+    }
+}
 
 pub fn churn_hotspots(records: &[CommitRecord]) -> Vec<ChurnStat> {
     let mut by: HashMap<&str, (u64, u64)> = HashMap::new();
@@ -15,8 +23,13 @@ pub fn churn_hotspots(records: &[CommitRecord]) -> Vec<ChurnStat> {
             e.1 += u64::from(f.removed);
         }
     }
-    let mut out: Vec<ChurnStat> = by.into_iter()
-        .map(|(path, (added, removed))| ChurnStat { path: path.to_string(), added, removed })
+    let mut out: Vec<ChurnStat> = by
+        .into_iter()
+        .map(|(path, (added, removed))| ChurnStat {
+            path: path.to_string(),
+            added,
+            removed,
+        })
         .collect();
     out.sort_by(|a, b| b.total().cmp(&a.total()).then(a.path.cmp(&b.path)));
     out

@@ -1,11 +1,11 @@
-pub mod committers;
-pub mod churn;
 pub mod biggest;
+pub mod churn;
+pub mod committers;
 pub mod nightowl;
-pub mod streaks;
-pub mod words;
 pub mod ownership;
+pub mod streaks;
 pub mod vitals;
+pub mod words;
 
 #[cfg(test)]
 pub(crate) fn rec(author: &str, ts: i64, files: &[(&str, u32, u32)]) -> crate::model::CommitRecord {
@@ -16,8 +16,13 @@ pub(crate) fn rec(author: &str, ts: i64, files: &[(&str, u32, u32)]) -> crate::m
         timestamp: ts,
         tz_offset_minutes: 0,
         message: "msg".into(),
-        files: files.iter().map(|(p, a, r)| crate::model::FileChurn {
-            path: (*p).into(), added: *a, removed: *r,
-        }).collect(),
+        files: files
+            .iter()
+            .map(|(p, a, r)| crate::model::FileChurn {
+                path: (*p).into(),
+                added: *a,
+                removed: *r,
+            })
+            .collect(),
     }
 }

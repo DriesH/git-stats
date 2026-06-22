@@ -1,22 +1,28 @@
+use git2::Repository;
+use git_stats::git::collect::{collect, list_oids, CollectOpts};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
-use git_stats::git::collect::{list_oids, collect, CollectOpts};
-use git2::Repository;
 use tempfile::TempDir;
 
 fn run(dir: &std::path::Path, args: &[&str]) {
-    let status = Command::new("git").current_dir(dir).args(args)
+    let status = Command::new("git")
+        .current_dir(dir)
+        .args(args)
         .env("GIT_AUTHOR_DATE", "2024-01-01T00:00:00Z")
         .env("GIT_COMMITTER_DATE", "2024-01-01T00:00:00Z")
-        .status().unwrap();
+        .status()
+        .unwrap();
     assert!(status.success());
 }
 
 fn run_at(dir: &std::path::Path, date: &str, args: &[&str]) {
-    let status = Command::new("git").current_dir(dir).args(args)
+    let status = Command::new("git")
+        .current_dir(dir)
+        .args(args)
         .env("GIT_AUTHOR_DATE", date)
         .env("GIT_COMMITTER_DATE", date)
-        .status().unwrap();
+        .status()
+        .unwrap();
     assert!(status.success());
 }
 
@@ -69,7 +75,11 @@ fn cancel_returns_early() {
     let cancel = AtomicBool::new(true); // pre-cancelled: every oid bails on entry
     let records = collect(dir, &oids, &done, &cancel);
     assert!(records.is_empty(), "cancelled run must produce no records");
-    assert_eq!(done.load(Ordering::Relaxed), 0, "cancelled oids are not counted");
+    assert_eq!(
+        done.load(Ordering::Relaxed),
+        0,
+        "cancelled oids are not counted"
+    );
 }
 
 /// Verify that `list_oids` respects both the `--limit` break and the `--since` break.
@@ -87,7 +97,11 @@ fn list_oids_respects_limit_and_since() {
 
     run_at(dir, "2024-01-01T00:00:00Z", &["init", "-q"]);
     run_at(dir, "2024-01-01T00:00:00Z", &["config", "user.name", "bob"]);
-    run_at(dir, "2024-01-01T00:00:00Z", &["config", "user.email", "b@x"]);
+    run_at(
+        dir,
+        "2024-01-01T00:00:00Z",
+        &["config", "user.email", "b@x"],
+    );
 
     // Commit 1 – 2024-01-01
     std::fs::write(dir.join("f"), "v1").unwrap();
@@ -107,11 +121,29 @@ fn list_oids_respects_limit_and_since() {
     let repo = Repository::open(dir).unwrap();
 
     // --limit 2: should return the 2 newest commits (mar, feb); exercises the limit break.
-    let limited = list_oids(&repo, &CollectOpts { limit: Some(2), since: None }).unwrap();
+    let limited = list_oids(
+        &repo,
+        &CollectOpts {
+            limit: Some(2),
+            since: None,
+        },
+    )
+    .unwrap();
     assert_eq!(limited.len(), 2, "limit=2 must return exactly 2 oids");
 
     // --since 2024-02-01T00:00:00Z (unix 1706745600): should return mar + feb; exercises the since break.
     let since_feb: i64 = 1706745600;
-    let since_filtered = list_oids(&repo, &CollectOpts { limit: None, since: Some(since_feb) }).unwrap();
-    assert_eq!(since_filtered.len(), 2, "since=2024-02-01 must return 2 oids (feb + mar)");
+    let since_filtered = list_oids(
+        &repo,
+        &CollectOpts {
+            limit: None,
+            since: Some(since_feb),
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        since_filtered.len(),
+        2,
+        "since=2024-02-01 must return 2 oids (feb + mar)"
+    );
 }

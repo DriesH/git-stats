@@ -2,7 +2,11 @@ use chrono::{NaiveDate, TimeZone, Utc};
 use clap::Parser;
 
 #[derive(Debug, Parser)]
-#[command(name = "git-stats", version, about = "Fun git repo stats in a TUI scoreboard")]
+#[command(
+    name = "git-stats",
+    version,
+    about = "Fun git repo stats in a TUI scoreboard"
+)]
 pub struct Args {
     /// Analyze at most N most-recent commits
     #[arg(long)]

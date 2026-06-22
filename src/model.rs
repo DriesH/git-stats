@@ -39,8 +39,16 @@ mod tests {
             tz_offset_minutes: 0,
             message: "m".into(),
             files: vec![
-                FileChurn { path: "a.rs".into(), added: 3, removed: 1 },
-                FileChurn { path: "b.rs".into(), added: 10, removed: 0 },
+                FileChurn {
+                    path: "a.rs".into(),
+                    added: 3,
+                    removed: 1,
+                },
+                FileChurn {
+                    path: "b.rs".into(),
+                    added: 10,
+                    removed: 0,
+                },
             ],
         };
         assert_eq!(r.lines_changed(), 14);

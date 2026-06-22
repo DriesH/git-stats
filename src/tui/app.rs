@@ -1,18 +1,25 @@
-use std::io::Stdout;
-use std::time::Duration;
+use crate::scoreboard::Scoreboard;
+use crate::tui::panels;
+use crate::tui::theme::{title_style, BANNER};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
-use ratatui::widgets::{Block, Borders, Paragraph, Tabs};
 use ratatui::text::Line;
+use ratatui::widgets::{Block, Borders, Paragraph, Tabs};
 use ratatui::Terminal;
-use crate::scoreboard::Scoreboard;
-use crate::tui::panels;
-use crate::tui::theme::{title_style, BANNER};
+use std::io::Stdout;
+use std::time::Duration;
 
 pub const TAB_TITLES: &[&str] = &[
-    "Committers", "Churn", "Biggest", "Night Owls", "Streaks", "Words", "Ownership", "Vitals",
+    "Committers",
+    "Churn",
+    "Biggest",
+    "Night Owls",
+    "Streaks",
+    "Words",
+    "Ownership",
+    "Vitals",
 ];
 
 pub struct AppState {
@@ -39,7 +46,10 @@ impl AppState {
     }
 }
 
-pub fn run_scoreboard(term: &mut Terminal<CrosstermBackend<Stdout>>, sb: &Scoreboard) -> Result<()> {
+pub fn run_scoreboard(
+    term: &mut Terminal<CrosstermBackend<Stdout>>,
+    sb: &Scoreboard,
+) -> Result<()> {
     let mut state = AppState::new();
     loop {
         term.draw(|f| {
@@ -53,13 +63,13 @@ pub fn run_scoreboard(term: &mut Terminal<CrosstermBackend<Stdout>>, sb: &Scoreb
                 ])
                 .split(f.area());
 
-            f.render_widget(
-                Paragraph::new(BANNER).style(title_style()),
-                chunks[0],
-            );
+            f.render_widget(Paragraph::new(BANNER).style(title_style()), chunks[0]);
 
             let tabs = Tabs::new(
-                TAB_TITLES.iter().map(|t| Line::from(*t)).collect::<Vec<_>>(),
+                TAB_TITLES
+                    .iter()
+                    .map(|t| Line::from(*t))
+                    .collect::<Vec<_>>(),
             )
             .select(state.tab)
             .block(Block::default().borders(Borders::ALL))
@@ -77,10 +87,7 @@ pub fn run_scoreboard(term: &mut Terminal<CrosstermBackend<Stdout>>, sb: &Scoreb
                 _ => f.render_widget(panels::vitals_widget(sb), chunks[2]),
             }
 
-            f.render_widget(
-                Paragraph::new("←/→ switch tab   q quit"),
-                chunks[3],
-            );
+            f.render_widget(Paragraph::new("←/→ switch tab   q quit"), chunks[3]);
         })?;
 
         if event::poll(Duration::from_millis(200))? {

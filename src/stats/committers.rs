@@ -1,8 +1,12 @@
-use std::collections::HashMap;
 use crate::model::CommitRecord;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommitterStat { pub name: String, pub commits: usize, pub lines: u64 }
+pub struct CommitterStat {
+    pub name: String,
+    pub commits: usize,
+    pub lines: u64,
+}
 
 pub fn top_committers(records: &[CommitRecord]) -> Vec<CommitterStat> {
     let mut by: HashMap<&str, (usize, u64)> = HashMap::new();
@@ -11,8 +15,13 @@ pub fn top_committers(records: &[CommitRecord]) -> Vec<CommitterStat> {
         e.0 += 1;
         e.1 += r.lines_changed();
     }
-    let mut out: Vec<CommitterStat> = by.into_iter()
-        .map(|(name, (commits, lines))| CommitterStat { name: name.to_string(), commits, lines })
+    let mut out: Vec<CommitterStat> = by
+        .into_iter()
+        .map(|(name, (commits, lines))| CommitterStat {
+            name: name.to_string(),
+            commits,
+            lines,
+        })
         .collect();
     out.sort_by(|a, b| b.commits.cmp(&a.commits).then(a.name.cmp(&b.name)));
     out
