@@ -23,7 +23,7 @@ pub struct Scoreboard {
     pub vitals: Option<Vitals>,
 }
 
-/// Run all 8 independent analyzers concurrently over the same commit slice.
+/// Run all 10 independent analyzers concurrently over the same commit slice.
 pub fn analyze(records: &[CommitRecord]) -> Scoreboard {
     let mut committers = None;
     let mut churn = None;
