@@ -12,15 +12,55 @@ const STOPWORDS: &[&str] = &[
     "your", "all", "can", "use", "add", "now", "out",
 ];
 
+/// Git trailer keys (lowercased) whose lines carry metadata, not prose, and so
+/// are excluded from word/phrase analysis.
+const TRAILER_KEYS: &[&str] = &[
+    "co-authored-by",
+    "signed-off-by",
+    "reviewed-by",
+    "acked-by",
+    "tested-by",
+    "reported-by",
+    "suggested-by",
+    "refs",
+    "ref",
+    "cc",
+];
+
+/// True when a commit-message line is a git trailer or tool-generated
+/// boilerplate (e.g. "🤖 Generated with ..."), which would otherwise flood the
+/// word cloud with noise like author emails and tool names.
+fn is_noise_line(line: &str) -> bool {
+    let t = line.trim();
+    if t.starts_with('🤖') || t.to_lowercase().contains("generated with") {
+        return true;
+    }
+    // A `Key: value` trailer whose key is one of the known metadata keys. The
+    // key check (alphabetic/hyphen only) keeps conventional-commit subjects
+    // like "feat: add x" from being mistaken for trailers.
+    if let Some((key, _)) = t.split_once(':') {
+        let key = key.trim();
+        if !key.is_empty()
+            && key.chars().all(|c| c.is_ascii_alphabetic() || c == '-')
+            && TRAILER_KEYS.contains(&key.to_lowercase().as_str())
+        {
+            return true;
+        }
+    }
+    false
+}
+
 pub fn top_words(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
     let mut by: HashMap<String, usize> = HashMap::new();
     for r in records {
-        for raw in r.message.split(|c: char| !c.is_alphanumeric()) {
-            let w = raw.to_lowercase();
-            if w.len() < 3 || STOPWORDS.contains(&w.as_str()) {
-                continue;
+        for line in r.message.lines().filter(|l| !is_noise_line(l)) {
+            for raw in line.split(|c: char| !c.is_alphanumeric()) {
+                let w = raw.to_lowercase();
+                if w.len() < 3 || STOPWORDS.contains(&w.as_str()) {
+                    continue;
+                }
+                *by.entry(w).or_default() += 1;
             }
-            *by.entry(w).or_default() += 1;
         }
     }
     let mut out: Vec<WordCount> = by
@@ -35,24 +75,27 @@ pub fn top_words(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
 /// Count adjacent two-word phrases. A token is kept under the same rule as
 /// `top_words` (length >= 3, not a stopword). A dropped token breaks
 /// adjacency, so no phrase bridges a removed stopword. Empty splits (from
-/// runs of punctuation) are skipped without breaking adjacency.
+/// runs of punctuation) are skipped without breaking adjacency. Trailer and
+/// boilerplate lines are excluded, and phrases never bridge a line break.
 pub fn top_bigrams(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
     let mut by: HashMap<String, usize> = HashMap::new();
     for r in records {
-        let mut prev: Option<String> = None;
-        for raw in r.message.split(|c: char| !c.is_alphanumeric()) {
-            if raw.is_empty() {
-                continue;
+        for line in r.message.lines().filter(|l| !is_noise_line(l)) {
+            let mut prev: Option<String> = None;
+            for raw in line.split(|c: char| !c.is_alphanumeric()) {
+                if raw.is_empty() {
+                    continue;
+                }
+                let w = raw.to_lowercase();
+                if w.len() < 3 || STOPWORDS.contains(&w.as_str()) {
+                    prev = None;
+                    continue;
+                }
+                if let Some(p) = &prev {
+                    *by.entry(format!("{p} {w}")).or_default() += 1;
+                }
+                prev = Some(w);
             }
-            let w = raw.to_lowercase();
-            if w.len() < 3 || STOPWORDS.contains(&w.as_str()) {
-                prev = None;
-                continue;
-            }
-            if let Some(p) = &prev {
-                *by.entry(format!("{p} {w}")).or_default() += 1;
-            }
-            prev = Some(w);
         }
     }
     let mut out: Vec<WordCount> = by
@@ -171,6 +214,31 @@ mod tests {
         assert_eq!(w[0].count, 2);
         assert!(w.iter().any(|x| x.word == "login" && x.count == 2));
         assert!(!w.iter().any(|x| x.word == "the"));
+    }
+
+    #[test]
+    fn words_skip_trailers_and_boilerplate() {
+        let records = vec![msg(
+            "fix login bug\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+        )];
+        let w = top_words(&records, 50);
+        // Real prose survives.
+        assert!(w.iter().any(|x| x.word == "login"));
+        // Trailer / boilerplate noise is gone.
+        for noise in ["anthropic", "noreply", "authored", "claude", "generated"] {
+            assert!(!w.iter().any(|x| x.word == noise), "leaked: {noise}");
+        }
+    }
+
+    #[test]
+    fn bigrams_skip_trailers() {
+        let records = vec![msg(
+            "add cache layer\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+        )];
+        let b = top_bigrams(&records, 50);
+        assert!(b.iter().any(|x| x.word == "cache layer"));
+        assert!(!b.iter().any(|x| x.word == "noreply anthropic"));
+        assert!(!b.iter().any(|x| x.word.contains("anthropic")));
     }
 
     #[test]
