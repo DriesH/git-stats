@@ -65,10 +65,11 @@ pub fn list_oids(repo: &Repository, opts: &CollectOpts) -> anyhow::Result<Vec<Oi
 /// Compute a [`CommitRecord`] for every OID in `oids`, in parallel via rayon.
 ///
 /// Each rayon worker opens its own `Repository` handle because `git2::Repository`
-/// is not `Sync`. `done` is incremented for every OID that is actually processed
-/// (whether or not the result is `Some`). When `cancel` is set, workers return
-/// early without incrementing `done`, so the caller's completion counter never
-/// stalls.
+/// is not `Sync`. `done` is incremented for every OID that finishes processing,
+/// including those that fail to open or diff — but NOT for OIDs skipped due to
+/// `cancel`. Callers showing a progress bar must observe `cancel` directly: when
+/// cancellation occurs, `done` will not reach `total` because cancelled OIDs are
+/// not counted.
 pub fn collect(
     repo_path: &Path,
     oids: &[Oid],
@@ -79,10 +80,12 @@ pub fn collect(
         .map_init(
             || Repository::open(repo_path).ok(),
             |repo, oid| {
+                // Relaxed: best-effort bail-out flag, no ordering dependency on other data.
                 if cancel.load(Ordering::Relaxed) {
                     return None;
                 }
                 let rec = repo.as_ref().and_then(|r| record_for(r, *oid));
+                // Relaxed: `done` is read only after collect() returns (rayon join is the sync point).
                 done.fetch_add(1, Ordering::Relaxed);
                 rec
             },
@@ -96,6 +99,7 @@ fn record_for(repo: &Repository, oid: Oid) -> Option<CommitRecord> {
     let tree = commit.tree().ok()?;
     let parent_tree = commit.parent(0).ok().and_then(|p| p.tree().ok());
     let mut opts = DiffOptions::new();
+    opts.context_lines(0); // we only count +/- lines; context lines are wasted work here
     let diff = repo
         .diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut opts))
         .ok()?;
