@@ -65,6 +65,11 @@ pub fn accent_style() -> Style {
     maybe(Style::default().fg(Color::Yellow))
 }
 
+/// Dim gray — used for low-rank, low-emphasis entries in the word cloud.
+pub fn dim_style() -> Style {
+    maybe(Style::default().fg(Color::DarkGray))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,7 +92,9 @@ mod tests {
     fn no_color_yields_plain_style() {
         set_color_enabled(false);
         assert_eq!(title_style(), ratatui::style::Style::default());
+        assert_eq!(dim_style(), ratatui::style::Style::default());
         set_color_enabled(true); // restore for other tests in the binary
         assert_ne!(title_style(), ratatui::style::Style::default());
+        assert_ne!(dim_style(), ratatui::style::Style::default());
     }
 }

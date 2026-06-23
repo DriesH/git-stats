@@ -7,7 +7,7 @@ use crate::stats::{
     ownership::{ownership, OwnershipStat},
     streaks::{longest_streaks, StreakStat},
     vitals::{vitals, Vitals},
-    words::{top_words, WordCount},
+    words::{commit_types, top_bigrams, top_words, TypeCount, WordCount},
 };
 
 pub struct Scoreboard {
@@ -17,11 +17,13 @@ pub struct Scoreboard {
     pub nightowls: NightOwlStats,
     pub streaks: Vec<StreakStat>,
     pub words: Vec<WordCount>,
+    pub types: Vec<TypeCount>,
+    pub bigrams: Vec<WordCount>,
     pub ownership: Vec<OwnershipStat>,
     pub vitals: Option<Vitals>,
 }
 
-/// Run all 8 independent analyzers concurrently over the same commit slice.
+/// Run all 10 independent analyzers concurrently over the same commit slice.
 pub fn analyze(records: &[CommitRecord]) -> Scoreboard {
     let mut committers = None;
     let mut churn = None;
@@ -29,6 +31,8 @@ pub fn analyze(records: &[CommitRecord]) -> Scoreboard {
     let mut nightowls = None;
     let mut streaks = None;
     let mut words = None;
+    let mut types = None;
+    let mut bigrams = None;
     let mut ownership_ = None;
     let mut vitals_ = None;
 
@@ -39,6 +43,8 @@ pub fn analyze(records: &[CommitRecord]) -> Scoreboard {
         s.spawn(|_| nightowls = Some(night_owls(records)));
         s.spawn(|_| streaks = Some(longest_streaks(records)));
         s.spawn(|_| words = Some(top_words(records, 30)));
+        s.spawn(|_| types = Some(commit_types(records)));
+        s.spawn(|_| bigrams = Some(top_bigrams(records, 6)));
         s.spawn(|_| ownership_ = Some(ownership(records)));
         s.spawn(|_| vitals_ = Some(vitals(records)));
     });
@@ -50,6 +56,8 @@ pub fn analyze(records: &[CommitRecord]) -> Scoreboard {
         nightowls: nightowls.unwrap(),
         streaks: streaks.unwrap(),
         words: words.unwrap(),
+        types: types.unwrap(),
+        bigrams: bigrams.unwrap(),
         ownership: ownership_.unwrap(),
         vitals: vitals_.unwrap(),
     }
@@ -70,6 +78,8 @@ mod tests {
         assert_eq!(sb.committers.len(), 2);
         assert_eq!(sb.churn[0].path, "a.rs");
         assert!(sb.biggest.is_some());
+        assert_eq!(sb.types.iter().map(|t| t.count).sum::<usize>(), 2);
+        assert!(sb.bigrams.is_empty()); // "msg" is a single token -> no pairs
         assert!(sb.vitals.is_some());
         assert_eq!(sb.vitals.unwrap().total_commits, 2);
     }
