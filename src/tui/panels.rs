@@ -218,10 +218,21 @@ pub fn vitals_widget(sb: &Scoreboard) -> Paragraph<'_> {
 }
 
 pub fn oops_widget(sb: &Scoreboard) -> Paragraph<'_> {
-    let mut lines: Vec<Line> = vec![Line::from(Span::styled(
-        format!("{} oops commits total", sb.oops.total_oops),
-        accent_style(),
-    ))];
+    let mut lines: Vec<Line> = vec![
+        Line::from(Span::styled(
+            format!("{} oops commits total", sb.oops.total_oops),
+            accent_style(),
+        )),
+        Line::from(Span::styled(
+            "“oops” = a commit whose message owns a mistake:",
+            dim_style(),
+        )),
+        Line::from(Span::styled(
+            "wip, typo, revert, fixup, oops, forgot, broken, nvm…",
+            dim_style(),
+        )),
+        Line::from(""),
+    ];
     for (i, o) in sb.oops.leaders.iter().take(10).enumerate() {
         lines.push(Line::from(format!(
             "{} {:<20} {} oops / {} commits",
@@ -305,5 +316,39 @@ mod tests {
         let buf = term.backend().buffer().clone();
         let text: String = buf.content().iter().map(|c| c.symbol()).collect();
         assert!(text.contains("oops commits total"));
+    }
+
+    #[test]
+    fn oops_panel_explains_what_an_oops_is() {
+        let sb = analyze(&[rec("alice", 1_704_067_200, &[("a.rs", 5, 1)])], false);
+        let backend = TestBackend::new(70, 20);
+        let mut term = Terminal::new(backend).unwrap();
+        term.draw(|f| f.render_widget(oops_widget(&sb), f.area()))
+            .unwrap();
+        let buf = term.backend().buffer().clone();
+        let text: String = buf.content().iter().map(|c| c.symbol()).collect();
+        assert!(text.contains("owns a mistake"));
+    }
+
+    /// The 24-hour histogram plus the warrior/chronotype sections overflow a
+    /// short viewport; scrolling must reveal the late hours that fall off.
+    #[test]
+    fn nightowls_panel_scrolls_to_reveal_late_hours() {
+        let sb = analyze(&[rec("alice", 1_704_067_200, &[("a.rs", 5, 1)])], false);
+        // Content is taller than this viewport.
+        assert!(nightowls_widget(&sb).line_count(58) > 12);
+
+        let render = |scroll: u16| {
+            let backend = TestBackend::new(60, 12);
+            let mut term = Terminal::new(backend).unwrap();
+            term.draw(|f| f.render_widget(nightowls_widget(&sb).scroll((scroll, 0)), f.area()))
+                .unwrap();
+            let buf = term.backend().buffer().clone();
+            buf.content().iter().map(|c| c.symbol()).collect::<String>()
+        };
+
+        // At the top, the last hour is below the fold; scrolled down it appears.
+        assert!(!render(0).contains("23h"));
+        assert!(render(14).contains("23h"));
     }
 }
