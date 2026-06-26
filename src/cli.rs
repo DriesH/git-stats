@@ -23,6 +23,25 @@ pub struct Args {
     /// Include lock / generated / vendored files in churn & battlefield stats
     #[arg(long)]
     pub include_generated: bool,
+
+    /// Worker threads for commit collection (default: min(cores, 8))
+    #[arg(long)]
+    pub jobs: Option<usize>,
+}
+
+/// Default cap on collection worker threads. Commit diffing stops scaling past
+/// roughly this many threads because libgit2 serializes packfile access, and
+/// oversubscribing beyond it regresses wall time.
+const DEFAULT_JOBS_CAP: usize = 8;
+
+/// Resolve the number of collection worker threads. An explicit `--jobs` wins
+/// (floored at 1 so the pool is always valid); otherwise use the core count
+/// capped at [`DEFAULT_JOBS_CAP`].
+pub fn resolve_jobs(requested: Option<usize>, cores: usize) -> usize {
+    match requested {
+        Some(n) => n.max(1),
+        None => cores.clamp(1, DEFAULT_JOBS_CAP),
+    }
 }
 
 /// Parse a YYYY-MM-DD date string into a Unix timestamp (UTC midnight).
@@ -45,6 +64,26 @@ mod tests {
         assert!(a.no_color);
         assert!(a.since.is_none());
         assert!(!a.include_generated);
+        assert!(a.jobs.is_none());
+    }
+
+    #[test]
+    fn parses_jobs_override() {
+        let a = Args::parse_from(["git-stats", "--jobs", "4"]);
+        assert_eq!(a.jobs, Some(4));
+    }
+
+    #[test]
+    fn resolve_jobs_caps_core_count_by_default() {
+        assert_eq!(resolve_jobs(None, 14), 8);
+        assert_eq!(resolve_jobs(None, 4), 4);
+        assert_eq!(resolve_jobs(None, 0), 1);
+    }
+
+    #[test]
+    fn resolve_jobs_honors_explicit_override_above_and_below_cap() {
+        assert_eq!(resolve_jobs(Some(12), 14), 12);
+        assert_eq!(resolve_jobs(Some(0), 14), 1);
     }
 
     #[test]
