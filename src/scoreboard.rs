@@ -38,7 +38,7 @@ pub fn analyze(records: &[CommitRecord]) -> Scoreboard {
 
     rayon::scope(|s| {
         s.spawn(|_| committers = Some(top_committers(records)));
-        s.spawn(|_| churn = Some(churn_hotspots(records)));
+        s.spawn(|_| churn = Some(churn_hotspots(records, false)));
         s.spawn(|_| biggest = Some(biggest_commit(records)));
         s.spawn(|_| nightowls = Some(night_owls(records)));
         s.spawn(|_| streaks = Some(longest_streaks(records)));
