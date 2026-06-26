@@ -108,10 +108,14 @@ pub fn collapse_identities(records: Vec<CommitRecord>) -> Vec<CommitRecord> {
         }
     }
 
-    // Rule B — same name (case-insensitive, trimmed).
+    // Rule B — same name (case-insensitive, trimmed); skip empty names so blank
+    // authors are not all collapsed into one.
     let mut by_name: HashMap<String, usize> = HashMap::new();
     for (i, (name, _)) in identities.iter().enumerate() {
         let n = name.trim().to_lowercase();
+        if n.is_empty() {
+            continue;
+        }
         match by_name.get(&n) {
             Some(&j) => uf.union(i, j),
             None => {
@@ -221,6 +225,16 @@ mod tests {
         let recs = vec![
             rec("driesheyninck", "real@x.com"),
             rec("Dries via GitHub", "12345+driesheyninck@users.noreply.github.com"),
+        ];
+        let out = collapse_identities(recs);
+        assert_eq!(out[0].author_name, out[1].author_name);
+    }
+
+    #[test]
+    fn rule_c_plain_noreply_handle_matches_name() {
+        let recs = vec![
+            rec("driesheyninck", "real@x.com"),
+            rec("via GitHub", "driesheyninck@users.noreply.github.com"),
         ];
         let out = collapse_identities(recs);
         assert_eq!(out[0].author_name, out[1].author_name);
