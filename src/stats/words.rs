@@ -107,9 +107,10 @@ pub fn top_words(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
 }
 
 /// Count adjacent two-word phrases. A token is kept under the same rule as
-/// `top_words` (length >= 3, not a stopword). A dropped token breaks
-/// adjacency, so no phrase bridges a removed stopword. Empty splits (from
-/// runs of punctuation) are skipped without breaking adjacency. Trailer and
+/// `top_words` (length >= 3, not a stopword, not a number/hash). A dropped
+/// token breaks adjacency, so no phrase bridges a removed stopword. An empty
+/// slot — from a stripped URL or a run of punctuation — also breaks adjacency,
+/// so real words are never paired across removed content. Trailer and
 /// boilerplate lines are excluded, and phrases never bridge a line break.
 pub fn top_bigrams(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
     let mut by: HashMap<String, usize> = HashMap::new();
