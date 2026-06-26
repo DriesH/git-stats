@@ -1,4 +1,5 @@
 pub mod biggest;
+pub mod busiest;
 pub mod churn;
 pub mod committers;
 pub mod filters;
