@@ -119,6 +119,10 @@ pub fn top_bigrams(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
             let mut prev: Option<String> = None;
             for raw in cleaned.split(|c: char| !c.is_alphanumeric()) {
                 if raw.is_empty() {
+                    // An empty slot from a stripped URL or punctuation run breaks
+                    // bigram adjacency so that adjacent real words are not
+                    // incorrectly paired across the removed content.
+                    prev = None;
                     continue;
                 }
                 let w = raw.to_lowercase();
@@ -352,6 +356,15 @@ mod tests {
         }
         // Plain prose survives.
         assert!(w.iter().any(|x| x.word == "see"));
+    }
+
+    #[test]
+    fn bigrams_url_breaks_adjacency() {
+        // The stripped URL must not bridge "fix" <-> "regression".
+        let records = vec![msg("fix https://github.com/foo regression here")];
+        let b = top_bigrams(&records, 50);
+        assert!(!b.iter().any(|x| x.word == "fix regression"));
+        assert!(b.iter().any(|x| x.word == "regression here"));
     }
 
     #[test]

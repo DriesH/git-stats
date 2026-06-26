@@ -39,15 +39,26 @@ fn local(r: &CommitRecord) -> DateTime<Utc> {
 pub fn night_owls(records: &[CommitRecord]) -> NightOwlStats {
     let mut hours = [0usize; 24];
     let mut per_author: HashMap<&str, (usize, usize)> = HashMap::new(); // (weekend, total)
+    // Chronotype: night = 22:00-04:59, morning = 05:00-08:59 (local hour).
+    let mut chrono: HashMap<&str, (usize, usize, usize)> = HashMap::new(); // (night, morning, total)
     for r in records {
         let dt = local(r);
-        hours[dt.hour() as usize] += 1;
+        let hour = dt.hour();
+        hours[hour as usize] += 1;
         let is_weekend = matches!(dt.weekday(), Weekday::Sat | Weekday::Sun);
         let e = per_author.entry(r.author_name.as_str()).or_default();
         if is_weekend {
             e.0 += 1;
         }
         e.1 += 1;
+        let c = chrono.entry(r.author_name.as_str()).or_default();
+        if matches!(hour, 22 | 23 | 0 | 1 | 2 | 3 | 4) {
+            c.0 += 1;
+        }
+        if matches!(hour, 5..=8) {
+            c.1 += 1;
+        }
+        c.2 += 1;
     }
     let mut warriors: Vec<WeekendWarrior> = per_author
         .into_iter()
@@ -67,20 +78,6 @@ pub fn night_owls(records: &[CommitRecord]) -> NightOwlStats {
             .unwrap_or(std::cmp::Ordering::Equal)
             .then(a.name.cmp(&b.name))
     });
-
-    // Chronotype: night = 22:00-04:59, morning = 05:00-08:59 (local hour).
-    let mut chrono: HashMap<&str, (usize, usize, usize)> = HashMap::new(); // (night, morning, total)
-    for r in records {
-        let hour = local(r).hour();
-        let e = chrono.entry(r.author_name.as_str()).or_default();
-        if matches!(hour, 22 | 23 | 0 | 1 | 2 | 3 | 4) {
-            e.0 += 1;
-        }
-        if matches!(hour, 5..=8) {
-            e.1 += 1;
-        }
-        e.2 += 1;
-    }
     let chronotypes: Vec<Chronotype> = chrono
         .into_iter()
         .filter(|(_, (_, _, total))| *total >= 5)
