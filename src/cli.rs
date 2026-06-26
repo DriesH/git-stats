@@ -19,6 +19,10 @@ pub struct Args {
     /// Disable colors
     #[arg(long)]
     pub no_color: bool,
+
+    /// Include lock / generated / vendored files in churn & battlefield stats
+    #[arg(long)]
+    pub include_generated: bool,
 }
 
 /// Parse a YYYY-MM-DD date string into a Unix timestamp (UTC midnight).
@@ -40,6 +44,7 @@ mod tests {
         assert_eq!(a.limit, Some(50));
         assert!(a.no_color);
         assert!(a.since.is_none());
+        assert!(!a.include_generated);
     }
 
     #[test]
