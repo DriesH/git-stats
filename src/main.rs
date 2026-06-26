@@ -11,7 +11,7 @@ use git2::Repository;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
-use git_stats::cli::{parse_since, Args};
+use git_stats::cli::{parse_since, resolve_jobs, Args};
 use git_stats::git::collect::{collect, list_oids, CollectOpts};
 use git_stats::scoreboard::analyze;
 use git_stats::stats::identity::collapse_identities;
@@ -69,13 +69,27 @@ fn main() -> Result<()> {
     let done = AtomicUsize::new(0);
     let cancel = AtomicBool::new(false);
 
+    // Cap collection workers: commit diffing stops scaling past ~8 threads
+    // (libgit2 serializes packfile access) and oversubscribing all cores
+    // regresses wall time, so a capped pool is meaningfully faster than the
+    // default all-cores pool. `--jobs` overrides the default.
+    let cores = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
+    let jobs = resolve_jobs(args.jobs, cores);
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(jobs)
+        .build()
+        .context("failed to build collection thread pool")?;
+
     let _guard = TermGuard;
     let mut term = setup_terminal()?;
 
-    // Collection runs on rayon worker threads inside a scoped thread so the
-    // main thread can render the loading screen and poll for cancel.
+    // Collection runs on a scoped thread so the main thread can render the
+    // loading screen and poll for cancel; the diffing itself fans out across
+    // the capped `pool`.
     let records = std::thread::scope(|s| -> Result<Option<Vec<_>>> {
-        let handle = s.spawn(|| collect(&repo_path, &oids, &done, &cancel));
+        let handle = s.spawn(|| pool.install(|| collect(&repo_path, &oids, &done, &cancel)));
         let cancelled = run_loading(&mut term, &done, total, &cancel)?;
         let recs = handle.join().expect("collect thread panicked");
         if cancelled {
