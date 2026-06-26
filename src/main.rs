@@ -14,6 +14,7 @@ use ratatui::Terminal;
 use git_stats::cli::{parse_since, Args};
 use git_stats::git::collect::{collect, list_oids, CollectOpts};
 use git_stats::scoreboard::analyze;
+use git_stats::stats::identity::collapse_identities;
 use git_stats::tui::theme::set_color_enabled;
 use git_stats::tui::{app::run_scoreboard, loading::run_loading};
 
@@ -88,8 +89,9 @@ fn main() -> Result<()> {
         return Ok(()); // user cancelled; guard restores terminal
     };
     records.sort_by_key(|r| r.timestamp);
+    let records = collapse_identities(records);
 
-    let sb = analyze(&records);
+    let sb = analyze(&records, args.include_generated);
     run_scoreboard(&mut term, &sb)?;
     Ok(())
 }

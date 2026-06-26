@@ -9,7 +9,8 @@ pub struct WordCount {
 
 const STOPWORDS: &[&str] = &[
     "the", "and", "for", "with", "this", "that", "from", "into", "are", "was", "but", "not", "you",
-    "your", "all", "can", "use", "add", "now", "out",
+    "your", "all", "can", "use", "add", "now", "out", "merge", "branch", "pull", "request", "pr",
+    "wip", "via", "git",
 ];
 
 /// Git trailer keys (lowercased) whose lines carry metadata, not prose, and so
@@ -50,13 +51,46 @@ fn is_noise_line(line: &str) -> bool {
     false
 }
 
+/// Remove `http(s)://…` and `www.…` URLs and bare `host.tld` domains from a
+/// line before tokenization, so the word cloud is not flooded with `https`,
+/// `github`, `com`, etc. Replaces each match with a space to preserve adjacency
+/// breaks.
+fn strip_urls(line: &str) -> String {
+    const TLDS: &[&str] = &[".com", ".org", ".io", ".net", ".dev", ".gov", ".edu"];
+    let mut out = String::with_capacity(line.len());
+    for token in line.split_whitespace() {
+        let lower = token.to_lowercase();
+        let is_url = lower.starts_with("http://")
+            || lower.starts_with("https://")
+            || lower.starts_with("www.")
+            || TLDS.iter().any(|t| lower.contains(t));
+        if is_url {
+            out.push(' ');
+        } else {
+            out.push_str(token);
+        }
+        out.push(' ');
+    }
+    out
+}
+
+/// True when a token is a pure number or a short-SHA-looking hex string
+/// (length >= 7, all hex digits) — noise rather than a word.
+fn is_number_or_hash(word: &str) -> bool {
+    if word.chars().all(|c| c.is_ascii_digit()) {
+        return true;
+    }
+    word.len() >= 7 && word.chars().all(|c| c.is_ascii_hexdigit())
+}
+
 pub fn top_words(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
     let mut by: HashMap<String, usize> = HashMap::new();
     for r in records {
         for line in r.message.lines().filter(|l| !is_noise_line(l)) {
-            for raw in line.split(|c: char| !c.is_alphanumeric()) {
+            let cleaned = strip_urls(line);
+            for raw in cleaned.split(|c: char| !c.is_alphanumeric()) {
                 let w = raw.to_lowercase();
-                if w.len() < 3 || STOPWORDS.contains(&w.as_str()) {
+                if w.len() < 3 || STOPWORDS.contains(&w.as_str()) || is_number_or_hash(&w) {
                     continue;
                 }
                 *by.entry(w).or_default() += 1;
@@ -73,21 +107,27 @@ pub fn top_words(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
 }
 
 /// Count adjacent two-word phrases. A token is kept under the same rule as
-/// `top_words` (length >= 3, not a stopword). A dropped token breaks
-/// adjacency, so no phrase bridges a removed stopword. Empty splits (from
-/// runs of punctuation) are skipped without breaking adjacency. Trailer and
+/// `top_words` (length >= 3, not a stopword, not a number/hash). A dropped
+/// token breaks adjacency, so no phrase bridges a removed stopword. An empty
+/// slot — from a stripped URL or a run of punctuation — also breaks adjacency,
+/// so real words are never paired across removed content. Trailer and
 /// boilerplate lines are excluded, and phrases never bridge a line break.
 pub fn top_bigrams(records: &[CommitRecord], limit: usize) -> Vec<WordCount> {
     let mut by: HashMap<String, usize> = HashMap::new();
     for r in records {
         for line in r.message.lines().filter(|l| !is_noise_line(l)) {
+            let cleaned = strip_urls(line);
             let mut prev: Option<String> = None;
-            for raw in line.split(|c: char| !c.is_alphanumeric()) {
+            for raw in cleaned.split(|c: char| !c.is_alphanumeric()) {
                 if raw.is_empty() {
+                    // An empty slot from a stripped URL or punctuation run breaks
+                    // bigram adjacency so that adjacent real words are not
+                    // incorrectly paired across the removed content.
+                    prev = None;
                     continue;
                 }
                 let w = raw.to_lowercase();
-                if w.len() < 3 || STOPWORDS.contains(&w.as_str()) {
+                if w.len() < 3 || STOPWORDS.contains(&w.as_str()) || is_number_or_hash(&w) {
                     prev = None;
                     continue;
                 }
@@ -304,5 +344,37 @@ mod tests {
         assert_eq!(b.len(), 2);
         assert_eq!(b[0].word, "alpha beta");
         assert_eq!(b[0].count, 2);
+    }
+
+    #[test]
+    fn drops_urls_domains_numbers_and_hashes() {
+        let records = vec![msg(
+            "see https://github.com/foo/bar and www.example.org for 12345 abcdef1",
+        )];
+        let w = top_words(&records, 50);
+        for noise in ["github", "com", "https", "www", "example", "org", "12345", "abcdef1"] {
+            assert!(!w.iter().any(|x| x.word == noise), "leaked: {noise}");
+        }
+        // Plain prose survives.
+        assert!(w.iter().any(|x| x.word == "see"));
+    }
+
+    #[test]
+    fn bigrams_url_breaks_adjacency() {
+        // The stripped URL must not bridge "fix" <-> "regression".
+        let records = vec![msg("fix https://github.com/foo regression here")];
+        let b = top_bigrams(&records, 50);
+        assert!(!b.iter().any(|x| x.word == "fix regression"));
+        assert!(b.iter().any(|x| x.word == "regression here"));
+    }
+
+    #[test]
+    fn drops_new_mechanical_stopwords_but_keeps_update() {
+        let records = vec![msg("merge branch update parser")];
+        let w = top_words(&records, 50);
+        assert!(!w.iter().any(|x| x.word == "merge"));
+        assert!(!w.iter().any(|x| x.word == "branch"));
+        assert!(w.iter().any(|x| x.word == "update"));
+        assert!(w.iter().any(|x| x.word == "parser"));
     }
 }

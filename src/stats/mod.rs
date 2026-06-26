@@ -1,7 +1,12 @@
+pub mod battlefield;
 pub mod biggest;
+pub mod busiest;
 pub mod churn;
 pub mod committers;
+pub mod filters;
+pub mod identity;
 pub mod nightowl;
+pub mod oops;
 pub mod ownership;
 pub mod streaks;
 pub mod vitals;

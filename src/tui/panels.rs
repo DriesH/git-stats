@@ -87,6 +87,21 @@ pub fn nightowls_widget(sb: &Scoreboard) -> Paragraph<'_> {
             w.name, w.weekend_pct, w.total
         )));
     }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled("Biggest night owls", header_style())));
+    for c in sb.nightowls.night_owls.iter().take(3) {
+        lines.push(Line::from(format!(
+            "{:<20} {:.0}% night ({} commits)",
+            c.name, c.night_pct, c.total
+        )));
+    }
+    lines.push(Line::from(Span::styled("Earliest birds", header_style())));
+    for c in sb.nightowls.early_birds.iter().take(3) {
+        lines.push(Line::from(format!(
+            "{:<20} {:.0}% morning ({} commits)",
+            c.name, c.morning_pct, c.total
+        )));
+    }
     Paragraph::new(lines).block(panel_block(" Night Owls & Weekend Warriors "))
 }
 
@@ -202,6 +217,64 @@ pub fn vitals_widget(sb: &Scoreboard) -> Paragraph<'_> {
     Paragraph::new(text).block(panel_block(" Repo Vitals "))
 }
 
+pub fn oops_widget(sb: &Scoreboard) -> Paragraph<'_> {
+    let mut lines: Vec<Line> = vec![
+        Line::from(Span::styled(
+            format!("{} oops commits total", sb.oops.total_oops),
+            accent_style(),
+        )),
+        Line::from(Span::styled(
+            "“oops” = a commit whose message owns a mistake:",
+            dim_style(),
+        )),
+        Line::from(Span::styled(
+            "wip, typo, revert, fixup, oops, forgot, broken, nvm…",
+            dim_style(),
+        )),
+        Line::from(""),
+    ];
+    for (i, o) in sb.oops.leaders.iter().take(10).enumerate() {
+        lines.push(Line::from(format!(
+            "{} {:<20} {} oops / {} commits",
+            medal(i),
+            o.name,
+            o.oops,
+            o.total
+        )));
+    }
+    Paragraph::new(lines).block(panel_block(" Oops Counter "))
+}
+
+pub fn busiest_widget(sb: &Scoreboard) -> Paragraph<'_> {
+    let text = match &sb.busiest {
+        Some(b) => format!(
+            "📅 {}\n{} commits\ntop: {} ({} commits)",
+            b.date, b.commits, b.top_author, b.top_author_commits
+        ),
+        None => "no commits".to_string(),
+    };
+    Paragraph::new(text).block(panel_block(" Busiest Day "))
+}
+
+pub fn battlefield_widget(sb: &Scoreboard) -> Paragraph<'_> {
+    let lines: Vec<Line> = sb
+        .battlefield
+        .iter()
+        .take(10)
+        .enumerate()
+        .map(|(i, b)| {
+            Line::from(format!(
+                "{} {:<30} {} authors, {} commits",
+                medal(i),
+                b.path,
+                b.authors,
+                b.commits
+            ))
+        })
+        .collect();
+    Paragraph::new(lines).block(panel_block(" File Battlefield "))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -211,7 +284,7 @@ mod tests {
 
     #[test]
     fn renders_committers_without_panic_and_shows_name() {
-        let sb = analyze(&[rec("alice", 1_704_067_200, &[("a.rs", 5, 1)])]);
+        let sb = analyze(&[rec("alice", 1_704_067_200, &[("a.rs", 5, 1)])], false);
         let backend = TestBackend::new(60, 20);
         let mut term = Terminal::new(backend).unwrap();
         term.draw(|f| {
@@ -222,5 +295,60 @@ mod tests {
         let buf = term.backend().buffer().clone();
         let text: String = buf.content().iter().map(|c| c.symbol()).collect();
         assert!(text.contains("alice"));
+    }
+
+    #[test]
+    fn renders_oops_panel_without_panic() {
+        let sb = analyze(
+            &[
+                rec("alice", 1_704_067_200, &[("a.rs", 5, 1)]),
+                rec("bob", 1_704_153_600, &[("a.rs", 2, 0)]),
+            ],
+            false,
+        );
+        let backend = TestBackend::new(60, 20);
+        let mut term = Terminal::new(backend).unwrap();
+        term.draw(|f| {
+            let w = oops_widget(&sb);
+            f.render_widget(w, f.area());
+        })
+        .unwrap();
+        let buf = term.backend().buffer().clone();
+        let text: String = buf.content().iter().map(|c| c.symbol()).collect();
+        assert!(text.contains("oops commits total"));
+    }
+
+    #[test]
+    fn oops_panel_explains_what_an_oops_is() {
+        let sb = analyze(&[rec("alice", 1_704_067_200, &[("a.rs", 5, 1)])], false);
+        let backend = TestBackend::new(70, 20);
+        let mut term = Terminal::new(backend).unwrap();
+        term.draw(|f| f.render_widget(oops_widget(&sb), f.area()))
+            .unwrap();
+        let buf = term.backend().buffer().clone();
+        let text: String = buf.content().iter().map(|c| c.symbol()).collect();
+        assert!(text.contains("owns a mistake"));
+    }
+
+    /// The 24-hour histogram plus the warrior/chronotype sections overflow a
+    /// short viewport; scrolling must reveal the late hours that fall off.
+    #[test]
+    fn nightowls_panel_scrolls_to_reveal_late_hours() {
+        let sb = analyze(&[rec("alice", 1_704_067_200, &[("a.rs", 5, 1)])], false);
+        // Content is taller than this viewport.
+        assert!(nightowls_widget(&sb).line_count(58) > 12);
+
+        let render = |scroll: u16| {
+            let backend = TestBackend::new(60, 12);
+            let mut term = Terminal::new(backend).unwrap();
+            term.draw(|f| f.render_widget(nightowls_widget(&sb).scroll((scroll, 0)), f.area()))
+                .unwrap();
+            let buf = term.backend().buffer().clone();
+            buf.content().iter().map(|c| c.symbol()).collect::<String>()
+        };
+
+        // At the top, the last hour is below the fold; scrolled down it appears.
+        assert!(!render(0).contains("23h"));
+        assert!(render(14).contains("23h"));
     }
 }
