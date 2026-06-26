@@ -1,6 +1,7 @@
 pub mod biggest;
 pub mod churn;
 pub mod committers;
+pub mod filters;
 pub mod nightowl;
 pub mod ownership;
 pub mod streaks;
