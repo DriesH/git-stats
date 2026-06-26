@@ -20,6 +20,9 @@ pub const TAB_TITLES: &[&str] = &[
     "Words",
     "Ownership",
     "Vitals",
+    "Oops",
+    "Busiest",
+    "Battlefield",
 ];
 
 pub struct AppState {
@@ -84,7 +87,10 @@ pub fn run_scoreboard(
                 4 => f.render_widget(panels::streaks_widget(sb), chunks[2]),
                 5 => f.render_widget(panels::words_widget(sb), chunks[2]),
                 6 => f.render_widget(panels::ownership_widget(sb), chunks[2]),
-                _ => f.render_widget(panels::vitals_widget(sb), chunks[2]),
+                7 => f.render_widget(panels::vitals_widget(sb), chunks[2]),
+                8 => f.render_widget(panels::oops_widget(sb), chunks[2]),
+                9 => f.render_widget(panels::busiest_widget(sb), chunks[2]),
+                _ => f.render_widget(panels::battlefield_widget(sb), chunks[2]),
             }
 
             f.render_widget(Paragraph::new("←/→ switch tab   q quit"), chunks[3]);
